@@ -1,0 +1,19 @@
+{
+  "name": "instabackend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "React.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "exceljs": "^4.4.0",
+    "express": "^5.1.0",
+    "node-fetch": "^3.3.2",
+    "p-limit": "^7.1.1"
+  }
+}
