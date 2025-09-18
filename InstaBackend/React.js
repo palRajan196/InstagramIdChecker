@@ -1,100 +1,109 @@
+// backend/index.js
 import express from "express";
 import fetch from "node-fetch";
-import pLimit from "p-limit";
-import ExcelJS from "exceljs";
 import cors from "cors";
 
 const app = express();
+const PORT = 5000;
+
 app.use(cors());
 app.use(express.json());
 
-let progressData = {
-  total: 0,
-  completed: 0,
-  results: [],
-  done: false,
-  file: null,
-};
-
-// Function to check Instagram URL
+/**
+ * Function to check if an Instagram URL is Active, Dead, Private, etc.
+ */
 async function checkInstagram(url) {
   try {
-    const res = await fetch(url, { method: "GET", timeout: 5000 });
-    if (res.status === 200) return "Active ✅";
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const res = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      redirect: "follow",
+    });
+
+    clearTimeout(timeout);
+
+    const html = await res.text();
+    const l = html.toLowerCase();
+
+    // If page not found
     if (res.status === 404) return "Dead ❌";
-    return `Error (${res.status})`;
+
+    // Known dead phrases
+    const deadPhrases = [
+      "sorry, this page isn't available",
+      "page not found",
+      "the link you followed may be broken",
+      "content not available",
+      "page was removed",
+    ];
+    for (const phrase of deadPhrases) {
+      if (l.includes(phrase)) {
+        return "Dead ❌";
+      }
+    }
+
+    // Private account
+    if (l.includes("this account is private")) {
+      return "Private 🔒";
+    }
+
+    // Detect Instagram meta tags
+    const hasOgVideo =
+      l.includes("og:video") || l.includes("og:video:secure_url");
+    const hasJsonLdVideo = l.includes('"@type":"videoobject"');
+    const hasOgUrl = l.includes("og:url");
+
+    // ✅ Active post rule
+    if (hasOgUrl && (hasOgVideo || hasJsonLdVideo)) {
+      return "Active ✅";
+    }
+
+    // ❌ If og:url exists but no video meta → Dead
+    if (hasOgUrl && !hasOgVideo && !hasJsonLdVideo) {
+      return "Dead ❌";
+    }
+
+    // Default → Dead
+    return "Dead ❌";
   } catch (err) {
+    if (err.name === "AbortError") {
+      return "Failed (timeout) ❌";
+    }
     return "Failed ❌";
   }
 }
 
-// Step 1: Start checking
-app.post("/check-urls", async (req, res) => {
+/**
+ * POST API: check multiple Instagram URLs
+ */
+app.post("/api/check", async (req, res) => {
   const { urls } = req.body;
+
   if (!urls || !Array.isArray(urls)) {
-    return res.status(400).send("Invalid URLs");
+    return res.status(400).json({ error: "Invalid input, expected an array of URLs" });
   }
 
-  progressData = {
-    total: urls.length,
-    completed: 0,
-    results: [],
-    done: false,
-    file: null,
-  };
+  const results = [];
+  for (const url of urls) {
+    const status = await checkInstagram(url);
+    results.push({
+      url,
+      status,
+      checkedAt: new Date().toLocaleString(),
+    });
+  }
 
-  const limit = pLimit(50);
-
-  // Process in background (async, don’t block response)
-  (async () => {
-    await Promise.all(
-      urls.map((url) =>
-        limit(async () => {
-          const status = await checkInstagram(url);
-          progressData.results.push({
-            url,
-            status,
-            checkedAt: new Date().toLocaleString(),
-          });
-          progressData.completed++;
-        })
-      )
-    );
-
-    // Create Excel after all done
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Results");
-
-    worksheet.columns = [
-      { header: "URL", key: "url", width: 40 },
-      { header: "Status", key: "status", width: 15 },
-      { header: "Checked At", key: "checkedAt", width: 25 },
-    ];
-
-    progressData.results.forEach((r) => worksheet.addRow(r));
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    progressData.file = buffer.toString("base64");
-    progressData.done = true;
-  })();
-
-  res.json({ message: "Started processing", total: urls.length });
+  res.json(results);
 });
 
-// Step 2: Polling route
-app.get("/check-progress", (req, res) => {
-  const percent =
-    progressData.total > 0
-      ? Math.round((progressData.completed / progressData.total) * 100)
-      : 0;
-
-  res.json({
-    percent,
-    done: progressData.done,
-    file: progressData.done ? progressData.file : null,
-  });
+app.listen(PORT, () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
 });
-
-app.listen(5000, () =>
-  console.log("✅ Backend running on http://localhost:5000")
-);
