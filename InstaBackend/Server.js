@@ -1,101 +1,133 @@
 // Server.js
 import express from "express";
 import cors from "cors";
-import fs from "fs";
 import puppeteer from "puppeteer";
 
 const app = express();
-app.use(cors());
-app.use(express.json());
-
 const PORT = process.env.PORT || 5000;
 
-// Load cookies if you want to access private accounts
-let cookies = [];
-try {
-  cookies = JSON.parse(fs.readFileSync("./cookies.json", "utf8"));
-} catch {
-  console.warn("No cookies.json found, private accounts may return Unknown ❓.");
-}
+app.use(cors({ origin: "*" }));
+app.use(express.json());
 
-// Check Instagram URL
-async function checkInstagram(url, browser) {
-  let page;
+/**
+ * Detect Instagram post status
+ */
+async function checkInstagram(page, url) {
   try {
-    page = await browser.newPage();
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    );
-    if (cookies.length) await page.setCookie(...cookies);
+    await page.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: 20000,
+    });
 
-    // Go to URL
-    const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+    // Grab meta + body
+    const meta = await page.evaluate(() => {
+      const getMeta = (name) =>
+        document.querySelector(`meta[property='${name}']`)?.content || null;
 
-    if (!response || response.status() === 404) {
-      await page.close();
+      const jsonLd = Array.from(
+        document.querySelectorAll("script[type='application/ld+json']")
+      )
+        .map((el) => {
+          try {
+            return JSON.parse(el.innerText);
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+
+      return {
+        ogUrl: getMeta("og:url"),
+        ogType: getMeta("og:type"),
+        ogVideo: getMeta("og:video"),
+        ogImage: getMeta("og:image"),
+        title: document.title,
+        bodyText: document.body.innerText.toLowerCase(),
+        jsonLd,
+      };
+    });
+
+    // ❌ Dead phrases
+    if (
+      meta.bodyText.includes("sorry, this page isn't available") ||
+      meta.bodyText.includes("page not found") ||
+      meta.bodyText.includes("link you followed may be broken") ||
+      meta.bodyText.includes("content not available")
+    ) {
       return "Dead ❌";
     }
 
-    // Wait for content or error container
-    try {
-      await page.waitForSelector("article, video, .error-container", { timeout: 5000 });
-    } catch {
-      await page.close();
-      return "Unknown ❓";
+    // 🔒 Private
+    if (
+      meta.title?.toLowerCase().includes("private") ||
+      meta.bodyText.includes("this account is private")
+    ) {
+      return "Private 🔒";
     }
 
-    // Detect status based on elements
-    const status = await page.evaluate(() => {
-      if (document.querySelector("article") || document.querySelector("video")) return "Active ✅";
-      if (document.body.innerText.includes("Sorry, this page isn’t available") || document.body.innerText.includes("Page Not Found"))
-        return "Dead ❌";
-      if (document.body.innerText.includes("This Account is Private")) return "Private 🔒";
-      return "Unknown ❓";
-    });
+    // ✅ Active if video/image exists
+    if (meta.ogType === "video.other" && (meta.ogVideo || meta.ogImage)) {
+      return "Active ✅";
+    }
 
-    await page.close();
-    return status;
+    // ✅ Active if JSON-LD video
+    const hasVideoJsonLd = meta.jsonLd.some(
+      (obj) => obj["@type"]?.toLowerCase() === "videoobject"
+    );
+    if (hasVideoJsonLd) {
+      return "Active ✅";
+    }
+
+    // ❌ Dead if og:url exists but no media
+    if (meta.ogUrl && !meta.ogVideo && !meta.ogImage && !hasVideoJsonLd) {
+      return "Dead ❌";
+    }
+
+    // ❓ Fallback
+    return "Unknown ❓";
   } catch (err) {
-    if (page) await page.close();
+    console.error("Error checking:", url, err.message);
     return "Failed ❌";
   }
 }
 
-// Process URLs in batches
-async function processInBatches(urls, batchSize = 5) {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+/**
+ * POST /api/check → checks multiple URLs
+ */
+app.post("/api/check", async (req, res) => {
+  const { urls } = req.body;
 
-  const results = [];
-  for (let i = 0; i < urls.length; i += batchSize) {
-    const batch = urls.slice(i, i + batchSize);
-    const batchResults = await Promise.all(
-      batch.map(async (url) => {
-        const status = await checkInstagram(url, browser);
-        return { url, status, checkedAt: new Date().toLocaleString() };
-      })
-    );
-    results.push(...batchResults);
+  if (!urls || !Array.isArray(urls)) {
+    return res.status(400).json({ error: "Invalid input, expected array of URLs" });
   }
 
-  await browser.close();
-  return results;
-}
-
-// API endpoint
-app.post("/api/check", async (req, res) => {
+  let browser;
   try {
-    const { urls } = req.body;
-    if (!urls || !Array.isArray(urls)) return res.status(400).json({ error: "Invalid request, expected 'urls' array." });
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
 
-    const results = await processInBatches(urls, 5);
+    const results = [];
+    for (const url of urls) {
+      const status = await checkInstagram(page, url);
+      results.push({
+        url,
+        status,
+        checkedAt: new Date().toLocaleString(),
+      });
+    }
+
+    await browser.close();
     res.json(results);
   } catch (err) {
-    console.error("Server error:", err);
-    res.status(500).json({ error: "Server error" });
+    if (browser) await browser.close();
+    console.error("Server error:", err.message);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 });
 
-app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
+});
