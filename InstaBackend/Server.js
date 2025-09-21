@@ -6,7 +6,16 @@ import puppeteer from "puppeteer";
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors({ origin: "*" }));
+app.use(
+  cors({
+    origin: [
+      "https://instagram-108.onrender.com", // your frontend on Render
+      "http://localhost:5173"              // local dev (Vite default)
+    ],
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"]
+  })
+);
 app.use(express.json());
 
 /**
