@@ -10,15 +10,15 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 
-// Load Instagram cookies
+// Load cookies if you want to access private accounts
 let cookies = [];
 try {
   cookies = JSON.parse(fs.readFileSync("./cookies.json", "utf8"));
-} catch (err) {
-  console.warn("No cookies.json found, proceeding without cookies.");
+} catch {
+  console.warn("No cookies.json found, private accounts may return Unknown ❓.");
 }
 
-// Function to check Instagram URL
+// Check Instagram URL
 async function checkInstagram(url, browser) {
   let page;
   try {
@@ -26,26 +26,35 @@ async function checkInstagram(url, browser) {
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     );
+    if (cookies.length) await page.setCookie(...cookies);
 
-    if (cookies.length > 0) {
-      await page.setCookie(...cookies);
+    // Go to URL
+    const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+
+    if (!response || response.status() === 404) {
+      await page.close();
+      return "Dead ❌";
     }
 
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
+    // Wait for content or error container
+    try {
+      await page.waitForSelector("article, video, .error-container", { timeout: 5000 });
+    } catch {
+      await page.close();
+      return "Unknown ❓";
+    }
 
-    const pageStatus = await page.evaluate(() => {
-      if (document.querySelector("video")) return "Active ✅";
-      if (
-        document.body.innerText.includes("Sorry, this page isn’t available") ||
-        document.body.innerText.includes("Page Not Found")
-      )
+    // Detect status based on elements
+    const status = await page.evaluate(() => {
+      if (document.querySelector("article") || document.querySelector("video")) return "Active ✅";
+      if (document.body.innerText.includes("Sorry, this page isn’t available") || document.body.innerText.includes("Page Not Found"))
         return "Dead ❌";
       if (document.body.innerText.includes("This Account is Private")) return "Private 🔒";
       return "Unknown ❓";
     });
 
     await page.close();
-    return pageStatus;
+    return status;
   } catch (err) {
     if (page) await page.close();
     return "Failed ❌";
@@ -55,30 +64,19 @@ async function checkInstagram(url, browser) {
 // Process URLs in batches
 async function processInBatches(urls, batchSize = 5) {
   const browser = await puppeteer.launch({
-    headless: "new", // headless mode
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-extensions",
-      "--disable-gpu",
-      "--disable-infobars",
-      "--window-size=1920,1080",
-    ],
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
 
   const results = [];
   for (let i = 0; i < urls.length; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
-    console.log(`🚀 Checking ${batch.length} URLs...`);
-
     const batchResults = await Promise.all(
       batch.map(async (url) => {
         const status = await checkInstagram(url, browser);
         return { url, status, checkedAt: new Date().toLocaleString() };
       })
     );
-
     results.push(...batchResults);
   }
 
@@ -90,8 +88,7 @@ async function processInBatches(urls, batchSize = 5) {
 app.post("/api/check", async (req, res) => {
   try {
     const { urls } = req.body;
-    if (!urls || !Array.isArray(urls))
-      return res.status(400).json({ error: "Invalid request, expected 'urls' array." });
+    if (!urls || !Array.isArray(urls)) return res.status(400).json({ error: "Invalid request, expected 'urls' array." });
 
     const results = await processInBatches(urls, 5);
     res.json(results);
@@ -101,4 +98,4 @@ app.post("/api/check", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
