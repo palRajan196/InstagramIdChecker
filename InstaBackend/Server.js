@@ -1,4 +1,3 @@
-// Server.js
 import express from "express";
 import cors from "cors";
 import fs from "fs";
@@ -10,7 +9,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 
-// Load Instagram cookies (optional, if you use them)
+// Load Instagram cookies if available
 let cookies = [];
 try {
   if (fs.existsSync("./cookies.json")) {
@@ -20,11 +19,11 @@ try {
   console.error("⚠️ Could not load cookies.json:", err.message);
 }
 
-// ✅ Launch browser with correct Chrome path
+// Launch Puppeteer with correct Chrome path
 async function launchBrowser() {
   return await puppeteer.launch({
     headless: true,
-    executablePath: puppeteer.executablePath(), // ✅ use correct path
+    executablePath: puppeteer.executablePath(), // ✅ Works on Render
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -37,11 +36,12 @@ async function launchBrowser() {
   });
 }
 
-// ✅ Function to check Instagram profile
+// Check Instagram page
 async function checkInstagram(url, browser) {
   let page;
   try {
     page = await browser.newPage();
+
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     );
@@ -52,7 +52,7 @@ async function checkInstagram(url, browser) {
 
     await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
-    const pageStatus = await page.evaluate(() => {
+    const status = await page.evaluate(() => {
       if (document.querySelector("video")) return "Active ✅";
       if (
         document.body.innerText.includes("Sorry, this page isn’t available") ||
@@ -65,14 +65,14 @@ async function checkInstagram(url, browser) {
     });
 
     await page.close();
-    return pageStatus;
+    return status;
   } catch (err) {
     if (page) await page.close();
     return "Failed ❌";
   }
 }
 
-// ✅ Batch processing
+// Process URLs in batches
 async function processInBatches(urls, batchSize = 5) {
   const browser = await launchBrowser();
   const results = [];
@@ -95,7 +95,7 @@ async function processInBatches(urls, batchSize = 5) {
   return results;
 }
 
-// ✅ API endpoint
+// API endpoint
 app.post("/api/check", async (req, res) => {
   try {
     const { urls } = req.body;
