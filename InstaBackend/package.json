@@ -1,17 +1,26 @@
 {
   "name": "instabackend",
   "version": "1.0.0",
+  "description": "Instagram URL checker backend",
   "main": "Server.js",
   "type": "module",
   "scripts": {
     "start": "node Server.js",
-    "postinstall": "npx puppeteer browsers install chrome"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": ["instagram", "checker", "puppeteer", "express"],
+  "author": "Your Name",
+  "license": "ISC",
   "dependencies": {
-    "express": "^5.1.0",
+    "axios": "^1.12.2",
+    "chrome-aws-lambda": "^1.20.1",
     "cors": "^2.8.5",
-    "puppeteer": "^24.2.0",
+    "express": "^5.1.0",
+    "puppeteer": "^24.22.0",
     "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "exceljs": "^4.4.0",
+    "node-fetch": "^3.3.2",
+    "p-limit": "^7.1.1"
   }
 }
