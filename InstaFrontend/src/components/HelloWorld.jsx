@@ -8,7 +8,7 @@ export default function HelloWorld() {
     try {
       // split by newline so user can paste multiple links
       const urls = input.split("\n").map(u => u.trim()).filter(u => u);
-      const response = await fetch("https://instagramidchecker.onrender.com/api/check", {
+      const res = await fetch("https://instagramidchecker.onrender.com/api/check", {
       //const res = await fetch("http://localhost:10000/api/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
