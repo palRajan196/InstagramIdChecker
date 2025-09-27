@@ -1,105 +1,61 @@
-// frontend/src/HelloWorld.jsx
 import React, { useState } from "react";
-import * as XLSX from "xlsx";
 
-const HelloWorld = () => {
-  const [urlsText, setUrlsText] = useState("");
+export default function HelloWorld() {
+  const [input, setInput] = useState("");
   const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
 
   const handleCheck = async () => {
-    const urls = urlsText
-      .split("\n")
-      .map((u) => u.trim())
-      .filter((u) => u);
-
-    if (urls.length === 0) {
-      alert("Please enter at least one Instagram URL.");
-      return;
-    }
-
-    setLoading(true);
-    setResults([]);
-   
-    
     try {
-    //  const res = await fetch("http://localhost:5000/api/check", {
-      const res = await fetch("https://instagramidchecker.onrender.com/api/check", {
+      // split by newline so user can paste multiple links
+      const urls = input.split("\n").map(u => u.trim()).filter(u => u);
+      const response = await fetch("https://instagramidchecker.onrender.com/api/check", {
+      //const res = await fetch("http://localhost:10000/api/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls }),
+        body: JSON.stringify({ urls }), // ✅ must send { urls: [...] }
       });
 
       if (!res.ok) throw new Error("Server error");
-
       const data = await res.json();
       setResults(data);
     } catch (err) {
-      console.error(err);
-      alert("Failed to check URLs. See console for details.");
-    } finally {
-      setLoading(false);
+      console.error("Error:", err);
+      alert("Error checking URLs");
     }
-  };
-
-  const handleDownloadExcel = () => {
-    if (results.length === 0) {
-      alert("No results to download.");
-      return;
-    }
-
-    const worksheet = XLSX.utils.json_to_sheet(results);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Instagram Status");
-    XLSX.writeFile(workbook, "instagram_status.xlsx");
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: "auto", padding: 20 }}>
-      <h2>Instagram URL Checker</h2>
+    <div style={{ padding: "20px" }}>
+      <h2>Instagram Link Checker</h2>
       <textarea
-        rows={10}
+        rows="6"
+        cols="60"
         placeholder="Paste Instagram URLs (one per line)"
-        value={urlsText}
-        onChange={(e) => setUrlsText(e.target.value)}
-        style={{ width: "100%", marginBottom: 10 }}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
       />
-      <div style={{ marginBottom: 10 }}>
-        <button onClick={handleCheck} disabled={loading}>
-          {loading ? "Checking..." : "Check URLs"}
-        </button>
-        <button
-          onClick={handleDownloadExcel}
-          style={{ marginLeft: 10 }}
-          disabled={results.length === 0}
-        >
-          Download Excel
-        </button>
-      </div>
-      <div>
-        {results.length > 0 && (
-          <table border="1" cellPadding="5" style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th>URL</th>
-                <th>Status</th>
-                <th>Checked At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((r, idx) => (
-                <tr key={idx}>
-                  <td>{r.url}</td>
-                  <td>{r.status}</td>
-                  <td>{r.checkedAt}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <br />
+      <button onClick={handleCheck}>Proceed</button>
+
+      <h3>Results:</h3>
+      <table border="1" cellPadding="5">
+        <thead>
+          <tr>
+            <th>URL</th>
+            <th>Status</th>
+            <th>Checked At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {results.map((r, i) => (
+            <tr key={i}>
+              <td>{r.url}</td>
+              <td>{r.status}</td>
+              <td>{r.checkedAt}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
-};
-
-export default HelloWorld;
+}

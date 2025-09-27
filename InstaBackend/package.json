@@ -1,15 +1,14 @@
 {
-  "name": "insta-backend",
+  "name": "instagram-checker-backend",
   "version": "1.0.0",
-  "description": "Instagram Checker Backend with Puppeteer",
-  "main": "Server.js",
+  "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node Server.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2",
-    "puppeteer": "^22.15.0"
+    "puppeteer": "^24.10.2"
   }
 }

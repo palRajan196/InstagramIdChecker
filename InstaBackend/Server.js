@@ -1,142 +1,75 @@
-// Server.js
+// Server.js (Backend)
 import express from "express";
 import cors from "cors";
 import puppeteer from "puppeteer";
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
-app.use(
-  cors({
-    origin: [
-      "https://instagram-108.onrender.com", // your frontend on Render
-      "http://localhost:5173"              // local dev (Vite default)
-    ],
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"]
-  })
-);
+app.use(cors());
 app.use(express.json());
 
-/**
- * Detect Instagram post status
- */
-async function checkInstagram(page, url) {
-  try {
-    await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout: 20000,
-    });
-
-    // Grab meta + body
-    const meta = await page.evaluate(() => {
-      const getMeta = (name) =>
-        document.querySelector(`meta[property='${name}']`)?.content || null;
-
-      const jsonLd = Array.from(
-        document.querySelectorAll("script[type='application/ld+json']")
-      )
-        .map((el) => {
-          try {
-            return JSON.parse(el.innerText);
-          } catch {
-            return null;
-          }
-        })
-        .filter(Boolean);
-
-      return {
-        ogUrl: getMeta("og:url"),
-        ogType: getMeta("og:type"),
-        ogVideo: getMeta("og:video"),
-        ogImage: getMeta("og:image"),
-        title: document.title,
-        bodyText: document.body.innerText.toLowerCase(),
-        jsonLd,
-      };
-    });
-
-    // ❌ Dead phrases
-    if (
-      meta.bodyText.includes("sorry, this page isn't available") ||
-      meta.bodyText.includes("page not found") ||
-      meta.bodyText.includes("link you followed may be broken") ||
-      meta.bodyText.includes("content not available")
-    ) {
-      return "Dead ❌";
-    }
-
-    // 🔒 Private
-    if (
-      meta.title?.toLowerCase().includes("private") ||
-      meta.bodyText.includes("this account is private")
-    ) {
-      return "Private 🔒";
-    }
-
-    // ✅ Active if video/image exists
-    if (meta.ogType === "video.other" && (meta.ogVideo || meta.ogImage)) {
-      return "Active ✅";
-    }
-
-    // ✅ Active if JSON-LD video
-    const hasVideoJsonLd = meta.jsonLd.some(
-      (obj) => obj["@type"]?.toLowerCase() === "videoobject"
-    );
-    if (hasVideoJsonLd) {
-      return "Active ✅";
-    }
-
-    // ❌ Dead if og:url exists but no media
-    if (meta.ogUrl && !meta.ogVideo && !meta.ogImage && !hasVideoJsonLd) {
-      return "Dead ❌";
-    }
-
-    // ❓ Fallback
-    return "Unknown ❓";
-  } catch (err) {
-    console.error("Error checking:", url, err.message);
-    return "Failed ❌";
-  }
-}
-
-/**
- * POST /api/check → checks multiple URLs
- */
-app.post("/api/check", async (req, res) => {
-  const { urls } = req.body;
-
-  if (!urls || !Array.isArray(urls)) {
-    return res.status(400).json({ error: "Invalid input, expected array of URLs" });
-  }
-
+// Function to check Instagram URL with Puppeteer
+async function checkInstagram(url) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      headless: true,
+      headless: "new",
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
     const page = await browser.newPage();
 
-    const results = [];
-    for (const url of urls) {
-      const status = await checkInstagram(page, url);
-      results.push({
-        url,
-        status,
-        checkedAt: new Date().toLocaleString(),
-      });
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+    );
+
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 20000 });
+
+    // Check for dead/error text
+    const bodyText = await page.evaluate(() => document.body.innerText.toLowerCase());
+    if (
+      bodyText.includes("sorry, this page isn't available") ||
+      bodyText.includes("page not found") ||
+      bodyText.includes("the link you followed may be broken")
+    ) {
+      return "Dead ❌";
     }
 
-    await browser.close();
-    res.json(results);
+    // Wait if a video/image container exists
+    const hasMedia = await page.$("video, img[src*='cdninstagram']");
+    if (hasMedia) {
+      return "Active ✅";
+    }
+
+    // Private account message
+    if (bodyText.includes("this account is private")) {
+      return "Private 🔒";
+    }
+
+    return "Unknown ❓";
   } catch (err) {
+    return "Failed ❌";
+  } finally {
     if (browser) await browser.close();
-    console.error("Server error:", err.message);
-    res.status(500).json({ error: "Server error", details: err.message });
   }
+}
+
+// API endpoint
+app.post("/api/check", async (req, res) => {
+  const { urls } = req.body;
+  if (!urls || !Array.isArray(urls)) {
+    return res.status(400).json({ error: "Invalid input, expected an array of URLs" });
+  }
+
+  const results = [];
+  for (const url of urls) {
+    const status = await checkInstagram(url);
+    results.push({ url, status, checkedAt: new Date().toLocaleString() });
+  }
+
+  res.json(results);
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`✅ Server running on port ${PORT}`);
 });
