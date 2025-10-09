@@ -1,19 +1,16 @@
 import express from "express";
 import cors from "cors";
 
-// Detect environment
-const isLocal = process.platform === 'win32' || process.env.LOCAL === 'true';
+const isLocal = process.platform === "win32" || process.env.LOCAL === "true";
 
 let puppeteer;
 let chromium;
 
 if (isLocal) {
-  // Local development (Windows/macOS) - use full Puppeteer
-  puppeteer = await import('puppeteer');
+  puppeteer = await import("puppeteer");
 } else {
-  // Cloud deployment (Linux) - use puppeteer-core + @sparticuz/chromium
-  puppeteer = await import('puppeteer-core');
-  chromium = await import('@sparticuz/chromium');
+  puppeteer = await import("puppeteer-core");
+  chromium = await import("@sparticuz/chromium");
 }
 
 const app = express();
@@ -22,20 +19,28 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.send("✅ Instagram Checker Backend is Running!");
+});
+
 async function checkInstagram(url) {
   let browser;
   try {
-    if (isLocal) {
-      browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
-    } else {
-      browser = await puppeteer.launch({
-        args: chromium.args,
-        executablePath: await chromium.executablePath(),
-        headless: true,
-      });
-    }
+    const launchOptions = isLocal
+      ? {
+          headless: true,
+          args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        }
+      : {
+          args: chromium.args,
+          defaultViewport: chromium.defaultViewport,
+          executablePath: chromium.executablePath || (await chromium.executablePath),
+          headless: chromium.headless,
+        };
 
+    browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
+
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
     );
@@ -54,7 +59,6 @@ async function checkInstagram(url) {
 
     const hasMedia = await page.$("video, img[src*='cdninstagram']");
     if (hasMedia) return "Active ✅";
-
     if (bodyText.includes("this account is private")) return "Private 🔒";
 
     return "Unknown ❓";
@@ -81,6 +85,6 @@ app.post("/api/check", async (req, res) => {
   res.json(results);
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT} (Local: ${isLocal})`);
-});
+app.listen(PORT, () =>
+  console.log(`✅ Server running on port ${PORT} (Local: ${isLocal ? "true" : "false"})`)
+);
