@@ -16,7 +16,26 @@ if (isLocal) {
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(cors());
+const allowedOrigins = [
+  "http://localhost:5173", // for local dev
+  "https://instagramidchecker-frontend.onrender.com", // ✅ your deployed frontend URL
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
+
+app.options("*", cors()); // <-- PASTE THIS LINE HERE
 app.use(express.json());
 
 app.get("/", (req, res) => {
