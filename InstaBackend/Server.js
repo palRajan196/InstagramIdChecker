@@ -7,54 +7,54 @@ let puppeteer;
 let chromium;
 
 if (isLocal) {
-  puppeteer = await import("puppeteer");
+  puppeteer = await import("puppeteer"); // full Puppeteer for local
 } else {
-  puppeteer = await import("puppeteer-core");
+  puppeteer = await import("puppeteer-core"); // lightweight for Render
   chromium = await import("@sparticuz/chromium");
 }
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// ✅ CORS setup (supports both local + deployed frontend)
 const allowedOrigins = [
-  "http://localhost:5173", // for local dev
-  "https://instagramidchecker-frontend.onrender.com", // ✅ your deployed frontend URL
+  "http://localhost:5173",
+  "https://instagramidchecker-frontend.onrender.com"
 ];
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+      else callback(new Error("Not allowed by CORS"));
     },
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
+    allowedHeaders: ["Content-Type"]
   })
 );
-
-app.options("*", cors()); // <-- PASTE THIS LINE HERE
+app.options("*", cors());
 app.use(express.json());
 
+// ✅ Simple test route
 app.get("/", (req, res) => {
   res.send("✅ Instagram Checker Backend is Running!");
 });
 
+// ✅ Puppeteer logic
 async function checkInstagram(url) {
   let browser;
   try {
     const launchOptions = isLocal
       ? {
           headless: true,
-          args: ["--no-sandbox", "--disable-setuid-sandbox"],
+          args: ["--no-sandbox", "--disable-setuid-sandbox"]
         }
       : {
           args: chromium.args,
           defaultViewport: chromium.defaultViewport,
-          executablePath: chromium.executablePath || (await chromium.executablePath),
-          headless: chromium.headless,
+          // ✅ FIXED: Always call the async function to get real path
+          executablePath: await chromium.executablePath(),
+          headless: chromium.headless
         };
 
     browser = await puppeteer.launch(launchOptions);
@@ -82,13 +82,14 @@ async function checkInstagram(url) {
 
     return "Unknown ❓";
   } catch (err) {
-    console.error("Error checking:", url, err);
+    console.error("Error checking:", url, err.message);
     return "Failed ❌";
   } finally {
     if (browser) await browser.close();
   }
 }
 
+// ✅ POST route for bulk URLs
 app.post("/api/check", async (req, res) => {
   const { urls } = req.body;
   if (!urls || !Array.isArray(urls)) {
@@ -104,6 +105,7 @@ app.post("/api/check", async (req, res) => {
   res.json(results);
 });
 
+// ✅ Start the server
 app.listen(PORT, () =>
   console.log(`✅ Server running on port ${PORT} (Local: ${isLocal ? "true" : "false"})`)
 );
