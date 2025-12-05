@@ -1,10 +1,16 @@
 import express from "express";
 import cors from "cors";
 
-const isLocal = process.platform === "win32" || process.env.LOCAL === "true";
+//nst isLocal = process.platform === "win32" || process.env.LOCAL === "true";
 
 // Use FULL Puppeteer everywhere
-const puppeteer = await import("puppeteer");
+//nst puppeteer = await import("puppeteer");
+
+import chromium from "@sparticuz/chromium";
+import puppeteer from "puppeteer-core";
+import fullPuppeteer from "puppeteer"; // ✅ ADD THIS
+
+const isLocal = process.platform === "win32" || process.env.LOCAL === "true";
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -39,22 +45,20 @@ async function checkInstagram(url) {
   try {
     const launchOptions = isLocal
       ? {
-          headless: "new",
-          args: ["--no-sandbox", "--disable-setuid-sandbox"]
+          headless: true,
+          args: ["--no-sandbox", "--disable-setuid-sandbox"],
+          executablePath: fullPuppeteer.executablePath(), // ✅ FIXED
         }
       : {
-          headless: "new",
-          executablePath: "/usr/bin/chromium",
-          args: [
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-gpu",
-            "--single-process"
-          ]
+          args: chromium.args,
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath(),
+          headless: chromium.headless,
         };
 
-    browser = await puppeteer.launch(launchOptions);
+    browser = isLocal
+      ? await fullPuppeteer.launch(launchOptions) // ✅ LOCAL FIX
+      : await puppeteer.launch(launchOptions);    // ✅ SERVER
     const page = await browser.newPage();
 
     await page.setUserAgent(
