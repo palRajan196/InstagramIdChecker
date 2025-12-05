@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Bulk checker for Instagram URLs using Puppeteer",
   "main": "server.js",
+  "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
