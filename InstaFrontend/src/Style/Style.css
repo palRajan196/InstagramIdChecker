@@ -1,0 +1,12 @@
+*{
+    background-color: rgb(53, 53, 52);
+}
+
+.Heading{
+    color: red;
+    font-size: 2rem;
+}
+#textArea{
+    width: 60vw;
+    height: 30vh;
+}

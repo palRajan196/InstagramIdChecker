@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import '../Style/Style.css';
+
 
 export default function InstagramBulkChecker() {
   const [urls, setUrls] = useState('');
@@ -75,9 +77,9 @@ export default function InstagramBulkChecker() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4 text-center">Instagram Bulk URL Checker</h1>
+      <h1  className="Heading">Instagram Bulk URL Checker</h1>
 
-      <textarea
+      <textarea id='textArea'
         value={urls}
         onChange={(e) => setUrls(e.target.value)}
         placeholder="Paste up to 3500 Instagram URLs (one per line)"
@@ -124,7 +126,7 @@ export default function InstagramBulkChecker() {
           {results.map((r, i) => (
             <div key={i} className="flex justify-between border-b py-1">
               <span className="truncate w-3/4">{r.url}</span>
-              <span>{r.status}</span>
+              <span>{" -> "}{r.status}</span>
             </div>
           ))}
         </div>

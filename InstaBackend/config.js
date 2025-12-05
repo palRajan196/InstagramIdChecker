@@ -1,0 +1,2 @@
+export const INSTAGRAM_USERNAME = "ss42352";
+export const INSTAGRAM_PASSWORD = "17112003";

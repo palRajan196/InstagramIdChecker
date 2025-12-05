@@ -46,7 +46,7 @@ async function checkInstagram(url) {
   try {
     const launchOptions = isLocal
       ? {
-          headless: true,
+          headless: "new",
           args: ["--no-sandbox", "--disable-setuid-sandbox"]
         }
       : {
@@ -67,9 +67,10 @@ async function checkInstagram(url) {
     await page.goto(url, { waitUntil: "networkidle2", timeout: 20000 });
 
     const bodyText = await page.evaluate(() => document.body.innerText.toLowerCase());
-
+    //console.log(bodyText);
     if (
       bodyText.includes("sorry, this page isn't available") ||
+      bodyText.includes("post isn't available") ||
       bodyText.includes("page not found") ||
       bodyText.includes("the link you followed may be broken")
     ) {
