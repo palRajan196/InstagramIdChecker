@@ -1,15 +1,10 @@
-{
-  "name": "insta-backend",
-  "version": "1.0.0",
-  "main": "Server.js",
-  "type": "module",
-  "scripts": {
-    "start": "node Server.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "puppeteer-core": "^22.6.0",
-    "@sparticuz/chromium": "^126.0.0"
-  }
-}
+services:
+  - type: web
+    name: instagram-checker-backend
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: "./build.sh && npm install"
+    startCommand: "node Server.js"
+    envVars:
+      NODE_ENV: "production"

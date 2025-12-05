@@ -3,20 +3,13 @@ import cors from "cors";
 
 const isLocal = process.platform === "win32" || process.env.LOCAL === "true";
 
-let puppeteer;
-let chromium;
-
-if (isLocal) {
-  puppeteer = await import("puppeteer"); // full Puppeteer for local
-} else {
-  puppeteer = await import("puppeteer-core"); // lightweight for Render
-  chromium = await import("@sparticuz/chromium");
-}
+// Use FULL Puppeteer everywhere
+const puppeteer = await import("puppeteer");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// ✅ CORS setup (supports both local + deployed frontend)
+// ===== CORS =====
 const allowedOrigins = [
   "http://localhost:5173",
   "https://instagramidchecker-frontend.onrender.com"
@@ -35,12 +28,12 @@ app.use(
 app.options("*", cors());
 app.use(express.json());
 
-// ✅ Simple test route
+// ===== TEST ROUTE =====
 app.get("/", (req, res) => {
   res.send("✅ Instagram Checker Backend is Running!");
 });
 
-// ✅ Puppeteer logic
+// ===== Puppeteer Logic =====
 async function checkInstagram(url) {
   let browser;
   try {
@@ -50,11 +43,15 @@ async function checkInstagram(url) {
           args: ["--no-sandbox", "--disable-setuid-sandbox"]
         }
       : {
-          args: chromium.args,
-          defaultViewport: chromium.defaultViewport,
-          // ✅ FIXED: Always call the async function to get real path
-          executablePath: await chromium.executablePath(),
-          headless: chromium.headless
+          headless: "new",
+          executablePath: "/usr/bin/chromium",
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--single-process"
+          ]
         };
 
     browser = await puppeteer.launch(launchOptions);
@@ -67,7 +64,7 @@ async function checkInstagram(url) {
     await page.goto(url, { waitUntil: "networkidle2", timeout: 20000 });
 
     const bodyText = await page.evaluate(() => document.body.innerText.toLowerCase());
-    //console.log(bodyText);
+
     if (
       bodyText.includes("sorry, this page isn't available") ||
       bodyText.includes("post isn't available") ||
@@ -90,7 +87,7 @@ async function checkInstagram(url) {
   }
 }
 
-// ✅ POST route for bulk URLs
+// ===== BULK CHECK ROUTE =====
 app.post("/api/check", async (req, res) => {
   const { urls } = req.body;
   if (!urls || !Array.isArray(urls)) {
@@ -106,7 +103,7 @@ app.post("/api/check", async (req, res) => {
   res.json(results);
 });
 
-// ✅ Start the server
+// ===== START SERVER =====
 app.listen(PORT, () =>
   console.log(`✅ Server running on port ${PORT} (Local: ${isLocal ? "true" : "false"})`)
 );
