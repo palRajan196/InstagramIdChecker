@@ -4,7 +4,7 @@ services:
     env: node
     region: singapore
     plan: free
-    buildCommand: "./build.sh && npm install"
-    startCommand: "node Server.js"
+    buildCommand: "npm install"
+    startCommand: "npm start"
     envVars:
       NODE_ENV: "production"

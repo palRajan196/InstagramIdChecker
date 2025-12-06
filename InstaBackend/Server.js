@@ -1,53 +1,50 @@
 import express from "express";
 import cors from "cors";
 
-//nst isLocal = process.platform === "win32" || process.env.LOCAL === "true";
-
-// Use FULL Puppeteer everywhere
-//nst puppeteer = await import("puppeteer");
-
 import chromium from "@sparticuz/chromium";
 import puppeteer from "puppeteer-core";
-import fullPuppeteer from "puppeteer"; // ✅ ADD THIS
+import fullPuppeteer from "puppeteer";
 
-const isLocal = process.platform === "win32" || process.env.LOCAL === "true";
+const isLocal =
+  process.platform === "win32" ||
+  process.env.LOCAL === "true";
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// ===== CORS =====
+// --------------------- CORS ---------------------
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://instagramidchecker-frontend.onrender.com"
+  "https://instagramidchecker-frontend.onrender.com",
 ];
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-      else callback(new Error("Not allowed by CORS"));
+      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error("Not allowed by CORS"));
     },
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"]
+    allowedHeaders: ["Content-Type"],
   })
 );
 app.options("*", cors());
 app.use(express.json());
 
-// ===== TEST ROUTE =====
+// --------------------- ROOT TEST ---------------------
 app.get("/", (req, res) => {
   res.send("✅ Instagram Checker Backend is Running!");
 });
 
-// ===== Puppeteer Logic =====
+// --------------------- PUPPETEER LOGIC ---------------------
 async function checkInstagram(url) {
   let browser;
   try {
     const launchOptions = isLocal
       ? {
-          headless: true,
+          headless: "new",
           args: ["--no-sandbox", "--disable-setuid-sandbox"],
-          executablePath: fullPuppeteer.executablePath(), // ✅ FIXED
+          executablePath: fullPuppeteer.executablePath(),
         }
       : {
           args: chromium.args,
@@ -57,8 +54,9 @@ async function checkInstagram(url) {
         };
 
     browser = isLocal
-      ? await fullPuppeteer.launch(launchOptions) // ✅ LOCAL FIX
-      : await puppeteer.launch(launchOptions);    // ✅ SERVER
+      ? await fullPuppeteer.launch(launchOptions)
+      : await puppeteer.launch(launchOptions);
+
     const page = await browser.newPage();
 
     await page.setUserAgent(
@@ -67,12 +65,14 @@ async function checkInstagram(url) {
 
     await page.goto(url, { waitUntil: "networkidle2", timeout: 20000 });
 
-    const bodyText = await page.evaluate(() => document.body.innerText.toLowerCase());
+    const bodyText = await page.evaluate(() =>
+      document.body.innerText.toLowerCase()
+    );
 
     if (
       bodyText.includes("sorry, this page isn't available") ||
-      bodyText.includes("post isn't available") ||
       bodyText.includes("page not found") ||
+      bodyText.includes("post isn't available") ||
       bodyText.includes("the link you followed may be broken")
     ) {
       return "Dead ❌";
@@ -80,6 +80,7 @@ async function checkInstagram(url) {
 
     const hasMedia = await page.$("video, img[src*='cdninstagram']");
     if (hasMedia) return "Active ✅";
+
     if (bodyText.includes("this account is private")) return "Private 🔒";
 
     return "Unknown ❓";
@@ -91,14 +92,18 @@ async function checkInstagram(url) {
   }
 }
 
-// ===== BULK CHECK ROUTE =====
+// --------------------- BULK CHECK ---------------------
 app.post("/api/check", async (req, res) => {
   const { urls } = req.body;
+
   if (!urls || !Array.isArray(urls)) {
-    return res.status(400).json({ error: "Invalid input, expected an array of URLs" });
+    return res.status(400).json({
+      error: "Invalid input, expected an array of URLs",
+    });
   }
 
   const results = [];
+
   for (const url of urls) {
     const status = await checkInstagram(url);
     results.push({ url, status, checkedAt: new Date().toLocaleString() });
@@ -107,7 +112,7 @@ app.post("/api/check", async (req, res) => {
   res.json(results);
 });
 
-// ===== START SERVER =====
+// --------------------- START ---------------------
 app.listen(PORT, () =>
-  console.log(`✅ Server running on port ${PORT} (Local: ${isLocal ? "true" : "false"})`)
+  console.log(`✅ Server running on port ${PORT} | Local: ${isLocal}`)
 );
