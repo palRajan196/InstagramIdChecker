@@ -14,8 +14,8 @@
     "cors": "^2.8.5",
 
     "@sparticuz/chromium": "127.0.0",
-    "puppeteer-core": "21.3.8",
-    "puppeteer": "21.3.8"
+    "puppeteer-core": "^24.0.0",
+    "puppeteer": "^24.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
