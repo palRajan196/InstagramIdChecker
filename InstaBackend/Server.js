@@ -3,7 +3,7 @@ import cors from "cors";
 
 import chromium from "@sparticuz/chromium";
 import puppeteer from "puppeteer-core";
-import fullPuppeteer from "puppeteer";
+//import fullPuppeteer from "puppeteer";
 
 const isLocal =
   process.platform === "win32" ||
@@ -53,10 +53,11 @@ async function checkInstagram(url) {
           headless: chromium.headless,
         };
 
-    browser = isLocal
-      ? await fullPuppeteer.launch(launchOptions)
-      : await puppeteer.launch(launchOptions);
+    // browser = isLocal
+    //   ? await fullPuppeteer.launch(launchOptions)
+    //   : await puppeteer.launch(launchOptions);
 
+    browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
     await page.setUserAgent(
