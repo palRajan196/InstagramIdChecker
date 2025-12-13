@@ -1,9 +1,6 @@
 import express from "express";
 import cors from "cors";
-
-import chromium from "@sparticuz/chromium";
-import puppeteer from "puppeteer-core";
-//import fullPuppeteer from "puppeteer";
+import puppeteer from "puppeteer";
 
 const isLocal =
   process.platform === "win32" ||
@@ -21,17 +18,17 @@ const allowedOrigins = [
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
       callback(new Error("Not allowed by CORS"));
     },
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
   })
 );
-app.options("*", cors());
+
 app.use(express.json());
 
-// --------------------- ROOT TEST ---------------------
+// --------------------- ROOT ---------------------
 app.get("/", (req, res) => {
   res.send("✅ Instagram Checker Backend is Running!");
 });
@@ -40,31 +37,25 @@ app.get("/", (req, res) => {
 async function checkInstagram(url) {
   let browser;
   try {
-    const launchOptions = isLocal
-      ? {
-          headless: "new",
-          args: ["--no-sandbox", "--disable-setuid-sandbox"],
-          executablePath: fullPuppeteer.executablePath(),
-        }
-      : {
-          args: chromium.args,
-          defaultViewport: chromium.defaultViewport,
-          executablePath: await chromium.executablePath(),
-          headless: chromium.headless,
-        };
+    browser = await puppeteer.launch({
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+      ],
+    });
 
-    // browser = isLocal
-    //   ? await fullPuppeteer.launch(launchOptions)
-    //   : await puppeteer.launch(launchOptions);
-
-    browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
     );
 
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 20000 });
+    await page.goto(url, {
+      waitUntil: "networkidle2",
+      timeout: 30000,
+    });
 
     const bodyText = await page.evaluate(() =>
       document.body.innerText.toLowerCase()
@@ -79,41 +70,45 @@ async function checkInstagram(url) {
       return "Dead ❌";
     }
 
+    if (bodyText.includes("this account is private")) {
+      return "Private 🔒";
+    }
+
     const hasMedia = await page.$("video, img[src*='cdninstagram']");
     if (hasMedia) return "Active ✅";
 
-    if (bodyText.includes("this account is private")) return "Private 🔒";
-
     return "Unknown ❓";
   } catch (err) {
-    console.error("Error checking:", url, err.message);
+    console.error("Error:", err.message);
     return "Failed ❌";
   } finally {
     if (browser) await browser.close();
   }
 }
 
-// --------------------- BULK CHECK ---------------------
+// --------------------- API ---------------------
 app.post("/api/check", async (req, res) => {
   const { urls } = req.body;
 
-  if (!urls || !Array.isArray(urls)) {
-    return res.status(400).json({
-      error: "Invalid input, expected an array of URLs",
-    });
+  if (!Array.isArray(urls)) {
+    return res.status(400).json({ error: "URLs must be an array" });
   }
 
   const results = [];
 
   for (const url of urls) {
     const status = await checkInstagram(url);
-    results.push({ url, status, checkedAt: new Date().toLocaleString() });
+    results.push({
+      url,
+      status,
+      checkedAt: new Date().toLocaleString(),
+    });
   }
 
   res.json(results);
 });
 
 // --------------------- START ---------------------
-app.listen(PORT, () =>
-  console.log(`✅ Server running on port ${PORT} | Local: ${isLocal}`)
-);
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});

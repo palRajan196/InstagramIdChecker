@@ -11,9 +11,9 @@ export default function InstagramBulkChecker() {
   const [progress, setProgress] = useState(0);
   //https://instagramidchecker.onrender.com
 
-//  const API_URL = 'http://localhost:10000/api/check'; // Change when deployed
+  const API_URL = 'http://localhost:10000/api/check'; // Change when deployed
 
-const API_URL = 'https://instagramidchecker.onrender.com/api/check';
+// const API_URL = 'https://instagramidchecker.onrender.com/api/check';
 
   const handleCheck = async () => {
     const urlList = urls.split(/\n|\s+/).filter(Boolean);
