@@ -140,6 +140,10 @@ app.post("/api/check", async (req, res) => {
 });
 
 // ---------------- START ----------------
-app.listen(PORT, () =>
-  console.log(`🚀 Server running on port ${PORT}`)
-);
+//app.listen(PORT, () =>
+//  console.log(`🚀 Server running on port ${PORT}`)
+//);
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});

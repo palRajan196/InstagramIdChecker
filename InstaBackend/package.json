@@ -1,6 +1,8 @@
 {
   "name": "instagram-checker-backend",
+  "version": "1.0.0",
   "type": "module",
+  "main": "Server.js",
   "scripts": {
     "start": "node Server.js"
   },
@@ -8,9 +10,10 @@
     "node": "18.x"
   },
   "dependencies": {
-    "@sparticuz/chromium": "114.0.0",
+    "express": "4.18.2",
+    "cors": "2.8.5",
     "puppeteer-core": "19.11.1",
-    "express": "^4.18.2",
-    "cors": "^2.8.5"
+    "@sparticuz/chromium": "114.0.0",
+    "debug": "4.3.4"
   }
 }
