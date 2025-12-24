@@ -213,7 +213,7 @@ export default function InstagramBulkChecker() {
           {results.map((r, i) => (
             <div key={i} className="flex justify-between border-b py-1">
               <span className="truncate w-3/4">{r.url}</span>
-              <span>{r.status}</span>
+              <span>"     "{r.status}</span>
             </div>
           ))}
         </div>

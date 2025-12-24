@@ -1,12 +1,16 @@
 {
-  "name": "insta-backend",
+  "name": "instagram-checker-backend",
   "type": "module",
   "scripts": {
     "start": "node Server.js"
   },
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "puppeteer": "^22.0.0"
+    "@sparticuz/chromium": "114.0.0",
+    "puppeteer-core": "19.11.1",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
   }
 }

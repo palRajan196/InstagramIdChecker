@@ -1,9 +1,10 @@
 import express from "express";
 import cors from "cors";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 
 const app = express();
-const PORT = 10000;
+const PORT = process.env.PORT || 10000;
 const BATCH_SIZE = 10;
 
 // ---------------- CORS ----------------
@@ -20,41 +21,40 @@ async function checkInstagram(page, url) {
   try {
     await page.goto(url, {
       waitUntil: "domcontentloaded",
-      timeout: 60000, // ⬅ increase timeout
+      timeout: 60000,
     });
 
-    // ⏳ Allow Instagram JS to hydrate
     await page.waitForTimeout(4000);
 
-    // 🧠 Wait until either content OR error appears
-    await page.waitForFunction(
-      () => {
-        const text = document.body.innerText.toLowerCase();
-        return (
-          text.includes("isn't available") ||
-          text.includes("page not found") ||
-          document.querySelector("time") ||
-          document.querySelector("article")
-        );
-      },
-      { timeout: 15000 }
-    ).catch(() => {}); // don't crash if timeout
+    await page
+      .waitForFunction(
+        () => {
+          const text = document.body.innerText.toLowerCase();
+          return (
+            text.includes("isn't available") ||
+            text.includes("page not found") ||
+            document.querySelector("time") ||
+            document.querySelector("article")
+          );
+        },
+        { timeout: 15000 }
+      )
+      .catch(() => {});
 
     const result = await page.evaluate(() => {
       const text = document.body.innerText.toLowerCase();
 
-      // ❌ DEAD
       if (
         text.includes("sorry, this page isn't available") ||
         text.includes("this page isn't available") ||
         text.includes("page not found") ||
         text.includes("the link you followed may be broken") ||
-        text.includes("post isn't available")
+        text.includes("post isn't available") ||
+        text.includes("video unavailable")
       ) {
         return "Dead ❌";
       }
 
-      // 🔒 PRIVATE
       if (text.includes("this account is private")) {
         return "Private 🔒";
       }
@@ -62,7 +62,6 @@ async function checkInstagram(page, url) {
       const timeTag = document.querySelector("time");
       const article = document.querySelector("article");
 
-      // ✅ ACTIVE requires BOTH
       if (timeTag && article) {
         return "Active ✅";
       }
@@ -77,7 +76,6 @@ async function checkInstagram(page, url) {
   }
 }
 
-
 // ---------------- API ----------------
 app.post("/api/check", async (req, res) => {
   const { urls } = req.body;
@@ -87,8 +85,10 @@ app.post("/api/check", async (req, res) => {
   }
 
   const browser = await puppeteer.launch({
-    headless: "new",
-    args: ["--no-sandbox"],
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
   });
 
   const results = [];
@@ -97,7 +97,6 @@ app.post("/api/check", async (req, res) => {
     for (let i = 0; i < urls.length; i += BATCH_SIZE) {
       const batch = urls.slice(i, i + BATCH_SIZE);
 
-      // open 10 pages at once
       const pages = await Promise.all(
         batch.map(async () => {
           const page = await browser.newPage();
@@ -114,10 +113,8 @@ app.post("/api/check", async (req, res) => {
         )
       );
 
-      // close pages
       await Promise.all(pages.map((p) => p.close()));
 
-      // store results
       batch.forEach((url, index) => {
         results.push({
           url,
@@ -144,5 +141,5 @@ app.post("/api/check", async (req, res) => {
 
 // ---------------- START ----------------
 app.listen(PORT, () =>
-  console.log(`🚀 Server running at http://localhost:${PORT}`)
+  console.log(`🚀 Server running on port ${PORT}`)
 );
